@@ -276,10 +276,16 @@ float pidGetFfJitterFactor()
 void pidResetIterm(void)
 {
     for (int axis = 0; axis < 3; axis++) {
-        pidData[axis].I = 0.0f;
-#if defined(USE_ABSOLUTE_CONTROL)
+            pidData[axis].P = 0; //kbi
+            pidData[axis].I = 0;
+            pidData[axis].D = 0; //kbi
+            pidData[axis].F = 0; //kbi
+
+            pidData[axis].Sum = 0; //kbi
+
+//#if defined(USE_ABSOLUTE_CONTROL)
         axisError[axis] = 0.0f;
-#endif
+//#endif
     }
 }
 
