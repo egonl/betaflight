@@ -910,14 +910,24 @@ const clivalue_t valueTable[] = {
     { "crashflip_motor_percent",    VAR_UINT8 |  MASTER_VALUE,  .config.minmaxUnsigned = { 0, 100 }, PG_MIXER_CONFIG, offsetof(mixerConfig_t, crashflip_motor_percent) },
     { "crashflip_expo",    VAR_UINT8 |  MASTER_VALUE,  .config.minmaxUnsigned = { 0, 100 }, PG_MIXER_CONFIG, offsetof(mixerConfig_t, crashflip_expo) },
 
-// PG_MOTOR_3D_CONFIG
-    { "3d_deadband_low",            VAR_UINT16 | MASTER_VALUE, .config.minmaxUnsigned = { PWM_PULSE_MIN, PWM_RANGE_MIDDLE }, PG_MOTOR_3D_CONFIG, offsetof(flight3DConfig_t, deadband3d_low) },
-    { "3d_deadband_high",           VAR_UINT16 | MASTER_VALUE, .config.minmaxUnsigned = { PWM_RANGE_MIDDLE, PWM_PULSE_MAX }, PG_MOTOR_3D_CONFIG, offsetof(flight3DConfig_t, deadband3d_high) },
-    { "3d_neutral",                 VAR_UINT16 | MASTER_VALUE, .config.minmaxUnsigned = { PWM_PULSE_MIN, PWM_PULSE_MAX }, PG_MOTOR_3D_CONFIG, offsetof(flight3DConfig_t, neutral3d) },
-    { "3d_deadband_throttle",       VAR_UINT16 | MASTER_VALUE, .config.minmaxUnsigned = { 1, 100 }, PG_MOTOR_3D_CONFIG, offsetof(flight3DConfig_t, deadband3d_throttle) },
-    { "3d_limit_low",               VAR_UINT16 | MASTER_VALUE, .config.minmaxUnsigned = { PWM_PULSE_MIN, PWM_RANGE_MIDDLE }, PG_MOTOR_3D_CONFIG, offsetof(flight3DConfig_t, limit3d_low) },
-    { "3d_limit_high",              VAR_UINT16 | MASTER_VALUE, .config.minmaxUnsigned = { PWM_RANGE_MIDDLE, PWM_PULSE_MAX }, PG_MOTOR_3D_CONFIG, offsetof(flight3DConfig_t, limit3d_high) },
-    { "3d_switched_mode",           VAR_UINT8 | MASTER_VALUE | MODE_LOOKUP, .config.lookup = { TABLE_OFF_ON }, PG_MOTOR_3D_CONFIG, offsetof(flight3DConfig_t, switched_mode3d) },
+    // PG_MOTOR_3D_CONFIG
+        { "3d_deadband_low",            VAR_UINT16 | MASTER_VALUE, .config.minmaxUnsigned = { PWM_PULSE_MIN, PWM_RANGE_MIDDLE }, PG_MOTOR_3D_CONFIG, offsetof(flight3DConfig_t, deadband3d_low) },
+        { "3d_deadband_high",           VAR_UINT16 | MASTER_VALUE, .config.minmaxUnsigned = { PWM_RANGE_MIDDLE, PWM_PULSE_MAX }, PG_MOTOR_3D_CONFIG, offsetof(flight3DConfig_t, deadband3d_high) },
+        { "3d_neutral",                 VAR_UINT16 | MASTER_VALUE, .config.minmaxUnsigned = { PWM_PULSE_MIN, PWM_PULSE_MAX }, PG_MOTOR_3D_CONFIG, offsetof(flight3DConfig_t, neutral3d) },
+        { "3d_deadband_throttle",       VAR_UINT16 | MASTER_VALUE, .config.minmaxUnsigned = { 1, 100 }, PG_MOTOR_3D_CONFIG, offsetof(flight3DConfig_t, deadband3d_throttle) },
+        { "3d_limit_low",               VAR_UINT16 | MASTER_VALUE, .config.minmaxUnsigned = { PWM_PULSE_MIN, PWM_RANGE_MIDDLE }, PG_MOTOR_3D_CONFIG, offsetof(flight3DConfig_t, limit3d_low) },
+        { "3d_limit_high",              VAR_UINT16 | MASTER_VALUE, .config.minmaxUnsigned = { PWM_RANGE_MIDDLE, PWM_PULSE_MAX }, PG_MOTOR_3D_CONFIG, offsetof(flight3DConfig_t, limit3d_high) },
+        { "3d_switched_mode",           VAR_UINT8 | MASTER_VALUE | MODE_LOOKUP, .config.lookup = { TABLE_OFF_ON }, PG_MOTOR_3D_CONFIG, offsetof(flight3DConfig_t, switched_mode3d) },
+
+        //KBI
+        { "3d_minsyncspeed",             VAR_UINT16 | MASTER_VALUE, .config.minmaxUnsigned = { 100, 5000 }, PG_MOTOR_3D_CONFIG, offsetof(flight3DConfig_t, minsyncspeed3d) },
+        { "3d_minsyncspeedphasetwo",     VAR_UINT16 | MASTER_VALUE, .config.minmaxUnsigned = { 2000, 10000 }, PG_MOTOR_3D_CONFIG, offsetof(flight3DConfig_t, minsyncspeedphasetwo3d) },
+
+        { "3d_reversalrampuppwr",        VAR_UINT8  | MASTER_VALUE, .config.minmaxUnsigned = { 5, 100 }, PG_MOTOR_3D_CONFIG, offsetof(flight3DConfig_t, reversalrampuppwr3d) },
+        { "3d_reversalRPMdifferential",  VAR_UINT8 | MASTER_VALUE, .config.minmaxUnsigned  = { 10 , 200 }, PG_MOTOR_3D_CONFIG, offsetof(flight3DConfig_t, reversalRPMdifferential3d) },
+        { "3d_stabilizeTimeMs",          VAR_UINT8 | MASTER_VALUE, .config.minmaxUnsigned  = { 0 , 250 }, PG_MOTOR_3D_CONFIG, offsetof(flight3DConfig_t, stabilizeTimeMs3d) },
+        { "3d_throttleStepDelay",       VAR_UINT8 | MASTER_VALUE, .config.minmaxUnsigned  = { 1 ,50 }, PG_MOTOR_3D_CONFIG, offsetof(flight3DConfig_t, throttleStepDelay3d ) },
+        { "3d_pidResetTimeMs",          VAR_UINT16 | MASTER_VALUE, .config.minmaxUnsigned  = { 0 , 500 }, PG_MOTOR_3D_CONFIG, offsetof(flight3DConfig_t, pidResetTimeMs3d ) },
 
 // PG_SERVO_CONFIG
 #ifdef USE_SERVOS
