@@ -542,9 +542,9 @@ FAST_CODE_NOINLINE void mixTable(timeUs_t currentTimeUs)
     mixerThrottle = throttle;
 
 #ifdef USE_DYN_IDLE
-    // Apply digital idle throttle offset when stick is at zero after all other adjustments are complete
+    // Set min throttle offset of 1% when stick is at zero and dynamic idle is active
     if (mixerRuntime.dynIdleMinRps > 0.0f) {
-        throttle = MAX(throttle, mixerRuntime.idleThrottleOffset);
+        throttle = MAX(throttle, 0.01f);
     }
 #endif
 
