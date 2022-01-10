@@ -24,6 +24,9 @@
 
 #include "platform.h"
 
+#include "blackbox/blackbox.h"
+#include "blackbox/blackbox_fielddefs.h"
+
 #include "build/debug.h"
 
 #include "common/axis.h"
@@ -123,6 +126,18 @@ static bool motordirectionchange[4];    // kbi
 static bool motorsynccomplete[4];       // kbi
 
 static int idlethrottle [4];            // kbi
+
+static void log3DEvent(uint32_t value)
+{
+#ifdef USE_BLACKBOX
+    if (blackboxConfig()->device) {
+        flightLogEvent_flightMode_t eventData;
+        eventData.lastFlags = value;
+        eventData.flags = 0;
+        blackboxLogEvent(FLIGHT_LOG_EVENT_FLIGHTMODE, (flightLogEventData_t *)&eventData);
+    }
+#endif    
+}
 
 static void calculateThrottleAndCurrentMotorEndpoints(timeUs_t currentTimeUs)
 {
@@ -263,6 +278,7 @@ static void calculateThrottleAndCurrentMotorEndpoints(timeUs_t currentTimeUs)
                      if ( motorsynccomplete[0] && motorsynccomplete[1] && motorsynccomplete[2] &&  motorsynccomplete[3]){
                          if (!syncphasetwo) {
                              syncphasetwo = true;
+                             log3DEvent(1);
                              syncspeed = minspeedphasetwo;
                              motorsynccomplete[0] = motorsynccomplete[1] = motorsynccomplete[2] = motorsynccomplete[3] = false;
                          }
@@ -274,9 +290,12 @@ static void calculateThrottleAndCurrentMotorEndpoints(timeUs_t currentTimeUs)
                  else idlethrottle[i] = constrain(--idlethrottle[i],50,100); //,50,125);
            }
 // Reversal Complete
-           if ( currentTimeUs >= reversalTimeUs && reversalInProcess ) {
+           if ( currentTimeUs >= reversalTimeUs && reversalInProcess) {
                pidResetIterm();  //kbi v10
-               reversalInProcess = false;
+               if (syncphasetwo) {
+                   reversalInProcess = false;
+                   log3DEvent(2);
+               }
            }
 // RPM Sync time to stabilize after reversal is complete, default = 50Ms
         }
@@ -284,6 +303,7 @@ static void calculateThrottleAndCurrentMotorEndpoints(timeUs_t currentTimeUs)
             if ( currentTimeUs >= reversalTimeUs + stabilizeTimeUs && stabilizeTimeInProcess ) {
                 stabilizeTimeInProcess = false; //kbi v10
                 pidResetIterm();  //kbi v10
+                log3DEvent(3);
             }
             else if (motorOutputMixSign == 1)  {  //Positive Throttle Stabilization
                    throttle = 0;
