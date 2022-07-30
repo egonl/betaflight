@@ -63,6 +63,9 @@
 
 #include "pid.h"
 
+#include "config/feature.h" //KBI
+#include "fc/rc_modes.h"  //KBI
+
 typedef enum {
     LEVEL_MODE_OFF = 0,
     LEVEL_MODE_R,
@@ -289,6 +292,11 @@ void pidResetIterm(void)
 #if defined(USE_ABSOLUTE_CONTROL)
         axisError[axis] = 0.0f;
 #endif
+        // kbi: This is Optional and Probably Not Needed
+        pidData[axis].P = 0.0f;
+        pidData[axis].D = 0.0f;
+        pidData[axis].F = 0.0f;
+        pidData[axis].Sum = 0.0f;
     }
 }
 
@@ -315,7 +323,7 @@ void pidUpdateAntiGravityThrottleFilter(float throttle)
     static float previousThrottle = 0.0f;
     const float throttleInv = 1.0f - throttle;
     float throttleDerivative = fabsf(throttle - previousThrottle) * pidRuntime.pidFrequency;
-    DEBUG_SET(DEBUG_ANTI_GRAVITY, 0, lrintf(throttleDerivative * 100)); 
+    DEBUG_SET(DEBUG_ANTI_GRAVITY, 0, lrintf(throttleDerivative * 100));
     throttleDerivative *= throttleInv * throttleInv;
     // generally focus on the low throttle period
     if (throttle > previousThrottle) {
@@ -327,7 +335,7 @@ void pidUpdateAntiGravityThrottleFilter(float throttle)
     // lower cutoff suppresses peaks relative to troughs and prolongs the effects
     // PT2 smoothing of throttle derivative.
     // 6 is a typical value for the peak boost factor with default cutoff of 6Hz
-    DEBUG_SET(DEBUG_ANTI_GRAVITY, 1, lrintf(throttleDerivative * 100)); 
+    DEBUG_SET(DEBUG_ANTI_GRAVITY, 1, lrintf(throttleDerivative * 100));
     pidRuntime.antiGravityThrottleD = throttleDerivative;
 }
 
@@ -446,7 +454,18 @@ STATIC_UNIT_TESTED FAST_CODE_NOINLINE float pidLevel(int axis, const pidProfile_
     angle += gpsRescueAngle[axis] / 100; // ANGLE IS IN CENTIDEGREES
 #endif
     angle = constrainf(angle, -levelAngleLimit, levelAngleLimit);
-    const float errorAngle = angle - ((attitude.raw[axis] - angleTrim->raw[axis]) / 10.0f);
+    float rawangle = ((attitude.raw[axis] - angleTrim->raw[axis]) / 10.0f);
+    if (!isUpright() && featureIsEnabled(FEATURE_3D) && !IS_RC_MODE_ACTIVE(BOX3D)) {
+        if (axis == PITCH) {
+            rawangle *= -1;
+        } else { //ROLL
+            if (rawangle < 0)
+                rawangle += 180;
+            else
+                rawangle -= 180;
+        }
+    }
+    const float errorAngle = angle - rawangle;
     if (FLIGHT_MODE(ANGLE_MODE) || FLIGHT_MODE(GPS_RESCUE_MODE)) {
         // ANGLE mode - control is angle based
         const float setpointCorrection = errorAngle * pidRuntime.levelGain;

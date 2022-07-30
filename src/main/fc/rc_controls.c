@@ -91,13 +91,20 @@ PG_RESET_TEMPLATE(armingConfig_t, armingConfig,
 
 PG_REGISTER_WITH_RESET_TEMPLATE(flight3DConfig_t, flight3DConfig, PG_MOTOR_3D_CONFIG, 0);
 PG_RESET_TEMPLATE(flight3DConfig_t, flight3DConfig,
-    .deadband3d_low = 1406,
-    .deadband3d_high = 1514,
-    .neutral3d = 1460,
+    .deadband3d_low = 1450, //KBI
+    .deadband3d_high = 1550,  //KBI
+    .neutral3d = 1500,    //KBI
     .deadband3d_throttle = 50,
     .limit3d_low = 1000,
     .limit3d_high = 2000,
-    .switched_mode3d = false
+    .switched_mode3d = false,
+    .minsyncspeed3d = 2500,      // KBI
+    .minsyncspeedphasetwo3d = 3500, // KBI
+    .reversalrampuppwr3d = 50,   // KBI
+    .reversalRPMdifferential3d = 30,// KBI
+    .stabilizeTimeMs3d = 0,      // KBI
+    .throttleStepDelay3d = 1,  //KBI
+    .pidResetTimeMs3d = 20     // KBI
 );
 
 bool isUsingSticksForArming(void)
