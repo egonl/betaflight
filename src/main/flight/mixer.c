@@ -105,14 +105,42 @@ static FAST_DATA_ZERO_INIT float motorRangeMax;
 static FAST_DATA_ZERO_INIT float motorOutputRange;
 static FAST_DATA_ZERO_INIT int8_t motorOutputMixSign;
 
+//KBI Tuning Variables
+// System Variable: 3d_minsyncspeed - Inital sync speed during reversal (2400 seems good for 3-inch quad)
+// System Variable: 3d_minsyncspeedphasetwo - Phase two sync speed during reversal (35000 seems good for 3-inch quad)
+// System Variable: 3d_reversalrampuppwr - 50 seems good for all quads tested to-date. Range is 5 to 100 percent
+// System Variable: 3d_reversalRPMdifferential -  30 seems good for all quads. RPM differential is used to determine if motors are reversed when checking RPMs
+// System Variable: 3d_stabilizeTimeMs - Motor stabilization time using deadband throttle after reversal sync is complete
+// System Variable: 3d_pidResetTimeMs - PID reset time after reversal sync is complete
+// System Variable: 3d_throttleStepDelay - Range 1 to 50.  Slows down throttle adjustments to allow motors to better synchronize
+
+static FAST_DATA_ZERO_INIT int8_t newmotorOutputMixSign; //kbi
+
+static bool reversalInProcess = false;  // kbi
+static bool stabilizeTimeInProcess = false;  // kbi
+static bool motordirectionchange[4];    // kbi
+static bool motorsynccomplete[4];       // kbi
+
+static float idlethrottle [4];            // kbi
+
 static void calculateThrottleAndCurrentMotorEndpoints(timeUs_t currentTimeUs)
 {
+
+    const int minspeed = flight3DConfig()->minsyncspeed3d / 100 / 2 * motorConfig()->motorPoleCount; //kbi
+    const int minspeedphasetwo = flight3DConfig()->minsyncspeedphasetwo3d / 100 / 2 * motorConfig()->motorPoleCount; //kbi
+    static int syncspeed; //kbi
+    const long unsigned int stabilizeTimeUs = flight3DConfig()->stabilizeTimeMs3d * 1000; //kbi
+    const unsigned int pidResetTimeUs = flight3DConfig()->pidResetTimeMs3d * 1000; //kbi
     static uint16_t rcThrottlePrevious = 0;   // Store the last throttle direction for deadband transitions
     static timeUs_t reversalTimeUs = 0; // time when motors last reversed in 3D mode
     static float motorRangeMinIncrease = 0;
+    static int motorMinRPM[4];          // kbi
+    static float rcPreviousth = 1500; //kbi
+    static bool syncphasetwo; //kbi
 
     float currentThrottleInputRange = 0;
-    if (mixerRuntime.feature3dEnabled) {
+
+    if (featureIsEnabled(FEATURE_3D)) {
         uint16_t rcCommand3dDeadBandLow;
         uint16_t rcCommand3dDeadBandHigh;
 
@@ -132,10 +160,12 @@ static void calculateThrottleAndCurrentMotorEndpoints(timeUs_t currentTimeUs)
             rcCommand3dDeadBandHigh = rxConfig()->midrc + flight3DConfig()->deadband3d_throttle;
         }
 
+        rcPreviousth = rcPreviousth - (rcPreviousth - rcCommand[THROTTLE])/(flight3DConfig()->throttleStepDelay3d * 10); //kbi Step Throttle
+
         const float rcCommandThrottleRange3dLow = rcCommand3dDeadBandLow - PWM_RANGE_MIN;
         const float rcCommandThrottleRange3dHigh = PWM_RANGE_MAX - rcCommand3dDeadBandHigh;
-
-        if (rcCommand[THROTTLE] <= rcCommand3dDeadBandLow || isFlipOverAfterCrashActive()) {
+//Low Throttle
+        if (rcPreviousth <= rcCommand3dDeadBandLow || isFlipOverAfterCrashActive()) {
             // INVERTED
             motorRangeMin = mixerRuntime.motorOutputLow;
             motorRangeMax = mixerRuntime.deadbandMotor3dLow;
@@ -147,37 +177,32 @@ static void calculateThrottleAndCurrentMotorEndpoints(timeUs_t currentTimeUs)
 #endif
             {
                 motorOutputMin = mixerRuntime.deadbandMotor3dLow;
-                motorOutputRange = mixerRuntime.motorOutputLow - mixerRuntime.deadbandMotor3dLow;
+                motorOutputRange = mixerRuntime.deadbandMotor3dLow - mixerRuntime.deadbandMotor3dLow;
             }
-
-            if (motorOutputMixSign != -1) {
-                reversalTimeUs = currentTimeUs;
-            }
-            motorOutputMixSign = -1;
-
-            rcThrottlePrevious = rcCommand[THROTTLE];
-            throttle = rcCommand3dDeadBandLow - rcCommand[THROTTLE];
+            throttle = rcCommand3dDeadBandLow - rcPreviousth;
+            rcThrottlePrevious = rcPreviousth;
+            newmotorOutputMixSign = -1;
             currentThrottleInputRange = rcCommandThrottleRange3dLow;
-        } else if (rcCommand[THROTTLE] >= rcCommand3dDeadBandHigh) {
+//High Throttle
+        } else if (rcPreviousth >= rcCommand3dDeadBandHigh) {
             // NORMAL
             motorRangeMin = mixerRuntime.deadbandMotor3dHigh;
             motorRangeMax = mixerRuntime.motorOutputHigh;
             motorOutputMin = mixerRuntime.deadbandMotor3dHigh;
             motorOutputRange = mixerRuntime.motorOutputHigh - mixerRuntime.deadbandMotor3dHigh;
-            if (motorOutputMixSign != 1) {
-                reversalTimeUs = currentTimeUs;
-            }
-            motorOutputMixSign = 1;
-            rcThrottlePrevious = rcCommand[THROTTLE];
-            throttle = rcCommand[THROTTLE] - rcCommand3dDeadBandHigh;
+            rcThrottlePrevious = rcPreviousth;
+            throttle = rcPreviousth - rcCommand3dDeadBandHigh;
+            newmotorOutputMixSign = 1;
             currentThrottleInputRange = rcCommandThrottleRange3dHigh;
+//Deadband LOW
         } else if ((rcThrottlePrevious <= rcCommand3dDeadBandLow &&
                 !flight3DConfigMutable()->switched_mode3d) ||
                 isMotorsReversed()) {
             // INVERTED_TO_DEADBAND
+            throttle = 0;
+            currentThrottleInputRange = rcCommandThrottleRange3dLow;
             motorRangeMin = mixerRuntime.motorOutputLow;
             motorRangeMax = mixerRuntime.deadbandMotor3dLow;
-
 #ifdef USE_DSHOT
             if (isMotorProtocolDshot()) {
                 motorOutputMin = mixerRuntime.motorOutputLow;
@@ -188,58 +213,113 @@ static void calculateThrottleAndCurrentMotorEndpoints(timeUs_t currentTimeUs)
                 motorOutputMin = mixerRuntime.deadbandMotor3dLow;
                 motorOutputRange = mixerRuntime.motorOutputLow - mixerRuntime.deadbandMotor3dLow;
             }
-
-            if (motorOutputMixSign != -1) {
-                reversalTimeUs = currentTimeUs;
-            }
-            motorOutputMixSign = -1;
-
-            throttle = 0;
-            currentThrottleInputRange = rcCommandThrottleRange3dLow;
+//Deadband HIGH
         } else {
             // NORMAL_TO_DEADBAND
+            throttle = 0;
+            currentThrottleInputRange = rcCommandThrottleRange3dHigh;
             motorRangeMin = mixerRuntime.deadbandMotor3dHigh;
             motorRangeMax = mixerRuntime.motorOutputHigh;
             motorOutputMin = mixerRuntime.deadbandMotor3dHigh;
             motorOutputRange = mixerRuntime.motorOutputHigh - mixerRuntime.deadbandMotor3dHigh;
-            if (motorOutputMixSign != 1) {
-                reversalTimeUs = currentTimeUs;
             }
-            motorOutputMixSign = 1;
-            throttle = 0;
-            currentThrottleInputRange = rcCommandThrottleRange3dHigh;
+//Motor Reversal Initiated
+        if (motorOutputMixSign != newmotorOutputMixSign) {
+            motorOutputMixSign = newmotorOutputMixSign;
+            syncphasetwo = false;
+            syncspeed = minspeed;
+            for (int i = 0; i < mixerRuntime.motorCount; i++) {
+               if (motorConfig()->dev.useDshotTelemetry){
+                   // USE_RPM_FILTER will only be defined if USE_DSHOT and USE_DSHOT_TELEMETRY are defined
+                   motorMinRPM[i] = getDshotTelemetry(i);
+                   motordirectionchange[i] = false;
+                   motorsynccomplete[i] = false;
+                   reversalInProcess = stabilizeTimeInProcess = true;
+                   reversalTimeUs = currentTimeUs + 500000; // Abort time 1/2-sec + stabilization time
+                   idlethrottle[i] = 50;
+               }
+               else{
+                   motorsynccomplete[i] = true;
+                   reversalTimeUs = currentTimeUs;
+                   syncphasetwo = true;
+               }
+            }
         }
-        if (currentTimeUs - reversalTimeUs < 250000) {
-            // keep iterm zero for 250ms after motor reversal
-            pidResetIterm();
+// RPM Sync reversal in process
+        if ( reversalInProcess ){
+            for (int i = 0; i < mixerRuntime.motorCount; i++) {
+                 if ( !motorsynccomplete[i] ){
+                     if ( getDshotTelemetry(i) < motorMinRPM[i] ) {
+                       motorMinRPM[i] = getDshotTelemetry(i);
+                     }
+                     if ( (getDshotTelemetry(i) > flight3DConfig()->reversalRPMdifferential3d + motorMinRPM[i] ) || currentTimeUs >= reversalTimeUs + 10000) {
+                         motordirectionchange[i] = true;   //Motor Is Accelerating So Motor Has Reversed
+                     }
+                     if ( motordirectionchange[i] && getDshotTelemetry(i) > syncspeed) {
+                             motorsynccomplete[i] = true;
+                     }
+
+                     if ( motorsynccomplete[0] && motorsynccomplete[1] && motorsynccomplete[2] &&  motorsynccomplete[3]){
+                         if (!syncphasetwo) {
+                             syncphasetwo = true;
+                             syncspeed = minspeedphasetwo;
+                             motorsynccomplete[0] = motorsynccomplete[1] = motorsynccomplete[2] = motorsynccomplete[3] = false;
+                         }
+
+                         else{
+                             reversalTimeUs = currentTimeUs;
+                         }
+                     }
+                 }
+                 else if (getDshotTelemetry(i) < syncspeed) idlethrottle[i] = constrainf(idlethrottle[i]+.1,0,150); //,0,100);
+                 else idlethrottle[i] = constrainf(idlethrottle[i]-.1,0,150); //,0,150);
+
+           }
+// Reversal Complete
+           if ( currentTimeUs >= reversalTimeUs && reversalInProcess ) {
+               pidResetIterm();  //kbi v10
+               reversalInProcess = false;
+           }
+// RPM Sync time to stabilize after reversal is complete, default = 50Ms
+        }
+        if (stabilizeTimeInProcess){
+            if ( currentTimeUs >= reversalTimeUs + stabilizeTimeUs && stabilizeTimeInProcess ) {
+                stabilizeTimeInProcess = false; //kbi v10
+                pidResetIterm();  //kbi v10
+            }
+            else if (motorOutputMixSign == 1)  {  //Positive Throttle Stabilization
+                   throttle = 0;
+                   currentThrottleInputRange = rcCommandThrottleRange3dHigh;
+                   motorRangeMin = mixerRuntime.deadbandMotor3dHigh;
+                   motorRangeMax = mixerRuntime.motorOutputHigh;
+                   motorOutputMin = mixerRuntime.deadbandMotor3dHigh;
+                   motorOutputRange = mixerRuntime.motorOutputHigh - mixerRuntime.deadbandMotor3dHigh;
+             }
+             else{  //Reverse Throttle Stabilization
+                   throttle = 0;
+                   currentThrottleInputRange = rcCommandThrottleRange3dLow;
+                   motorRangeMin = mixerRuntime.motorOutputLow;
+                   motorRangeMax = mixerRuntime.deadbandMotor3dLow;
+       #ifdef USE_DSHOT
+                   if (isMotorProtocolDshot()) {
+                       motorOutputMin = mixerRuntime.motorOutputLow;
+                       motorOutputRange = mixerRuntime.deadbandMotor3dLow - mixerRuntime.motorOutputLow;
+                   } else
+       #endif
+                   {
+                       motorOutputMin = mixerRuntime.deadbandMotor3dLow;
+                       motorOutputRange = mixerRuntime.motorOutputLow - mixerRuntime.deadbandMotor3dLow;
+                   }
+               }
+        }
+
+        //if (!motorConfig()->dev.useDshotTelemetry && currentTimeUs - reversalTimeUs < 250000) { //Default = 250Ms
+        if (currentTimeUs - reversalTimeUs < pidResetTimeUs ) {
+            // keep iterm zero after motor reversal
+            pidResetIterm();  //KBI V10
         }
     } else {
         throttle = rcCommand[THROTTLE] - PWM_RANGE_MIN + throttleAngleCorrection;
-        currentThrottleInputRange = PWM_RANGE;
-
-#ifdef USE_DYN_IDLE
-        if (mixerRuntime.dynIdleMinRps > 0.0f) {
-            const float maxIncrease = isAirmodeActivated() ? mixerRuntime.dynIdleMaxIncrease : 0.05f;
-            float minRps = rpmMinMotorFrequency();
-            DEBUG_SET(DEBUG_DYN_IDLE, 3, (minRps * 10));
-            float rpsError = mixerRuntime.dynIdleMinRps - minRps;
-            // PT1 type lowpass delay and smoothing for D
-            minRps = mixerRuntime.prevMinRps + mixerRuntime.minRpsDelayK * (minRps - mixerRuntime.prevMinRps);
-            float dynIdleD = (mixerRuntime.prevMinRps - minRps) * mixerRuntime.dynIdleDGain;
-            mixerRuntime.prevMinRps = minRps;
-            float dynIdleP = rpsError * mixerRuntime.dynIdlePGain;
-            rpsError = MAX(-0.1f, rpsError); //I rises fast, falls slowly
-            mixerRuntime.dynIdleI += rpsError * mixerRuntime.dynIdleIGain;
-            mixerRuntime.dynIdleI = constrainf(mixerRuntime.dynIdleI, 0.0f, maxIncrease);
-            motorRangeMinIncrease = constrainf((dynIdleP + mixerRuntime.dynIdleI + dynIdleD), 0.0f, maxIncrease);
-            DEBUG_SET(DEBUG_DYN_IDLE, 0, (MAX(-1000.0f, dynIdleP * 10000)));
-            DEBUG_SET(DEBUG_DYN_IDLE, 1, (mixerRuntime.dynIdleI * 10000));
-            DEBUG_SET(DEBUG_DYN_IDLE, 2, (dynIdleD * 10000));
-        } else {
-            motorRangeMinIncrease = 0;
-        }
-#endif
-
 #if defined(USE_BATTERY_VOLTAGE_SAG_COMPENSATION)
         float motorRangeAttenuationFactor = 0;
         // reduce motorRangeMax when battery is full
@@ -348,6 +428,7 @@ static void applyMixToMotors(float motorMix[MAX_SUPPORTED_MOTORS], motorMixer_t 
 {
     // Now add in the desired throttle, but keep in a range that doesn't clip adjusted
     // roll/pitch/yaw. This could move throttle down, but also up for those low throttle flips.
+
     for (int i = 0; i < mixerRuntime.motorCount; i++) {
         float motorOutput = motorOutputMixSign * motorMix[i] + throttle * activeMixer[i].throttle;
 #ifdef USE_THRUST_LINEARIZATION
@@ -366,9 +447,18 @@ static void applyMixToMotors(float motorMix[MAX_SUPPORTED_MOTORS], motorMixer_t 
                 motorOutput = (motorOutput < motorRangeMin) ? mixerRuntime.disarmMotorOutput : motorOutput; // Prevent getting into special reserved range
             }
 #endif
-            motorOutput = constrainf(motorOutput, mixerRuntime.disarmMotorOutput, motorRangeMax);
+            motorOutput = constrain(motorOutput, mixerRuntime.disarmMotorOutput, motorRangeMax);
         } else {
-            motorOutput = constrainf(motorOutput, motorRangeMin, motorRangeMax);
+            motorOutput = constrain(motorOutput, motorRangeMin, motorRangeMax);
+            if ( reversalInProcess ){
+                if ( !motorsynccomplete[i]) { //KBI Boost Throttle During Reversal Until MinSpeed is reached
+                        if (motorOutputMixSign == 1) motorOutput = 1000 + flight3DConfig()->reversalrampuppwr3d*10; // kbi
+                        else                         motorOutput =        flight3DConfig()->reversalrampuppwr3d*10; //KBI
+
+              } else if (motorOutputMixSign == 1) motorOutput = flight3DConfig()->deadband3d_high - flight3DConfig()->neutral3d + 1000 + (idlethrottle[i]) ;
+                else                              motorOutput = flight3DConfig()->deadband3d_high - flight3DConfig()->neutral3d + (idlethrottle[i]) ; //KBI
+
+           }
         }
         motor[i] = motorOutput;
     }

@@ -45,8 +45,8 @@ void pgResetFn_controlRateProfiles(controlRateConfig_t *controlRateConfig)
         RESET_CONFIG(controlRateConfig_t, &controlRateConfig[i],
             .thrMid8 = 50,
             .thrExpo8 = 0,
-            .tpa_rate = 65,
-            .tpa_breakpoint = 1350,
+            .tpa_rate = 75,                 //KBI default = 65
+            .tpa_breakpoint = 1750,         //KBI default = 1350
             .rates_type = RATES_TYPE_ACTUAL,
             .rcRates[FD_ROLL] = 7,
             .rcRates[FD_PITCH] = 7,
