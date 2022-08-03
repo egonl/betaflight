@@ -53,6 +53,7 @@ extern "C" {
     #include "fc/rc.h"
 
     #include "fc/rc_controls.h"
+    #include "fc/rc_modes.h"
     #include "fc/runtime_config.h"
 
     #include "flight/imu.h"
@@ -111,6 +112,9 @@ extern "C" {
     }
     bool getShouldUpdateFeedforward() { return true; }
     void initRcProcessing(void) { }
+    bool isUpsidedown(void) { return false; }
+    bool featureIsEnabled(uint32_t) { return false; }
+    bool IS_RC_MODE_ACTIVE(boxId_e) { return false; }
 }
 
 pidProfile_t *pidProfile;
