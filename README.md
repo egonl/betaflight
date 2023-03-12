@@ -1,3 +1,29 @@
+## 3D reversal sync fork from Ken Imhof
+
+### Added Tuning Variables
+
+#### 3d_minsyncspeed
+Inital sync speed during reversal (2400 seems good for 3-inch quad)
+
+### 3d_minsyncspeedphasetwo
+Phase two sync speed during reversal (35000 seems good for 3-inch quad)
+
+### 3d_reversalrampuppwr
+50 seems good for all quads tested to-date. Range is 5 to 100 percent
+
+### 3d_reversalRPMdifferential
+30 seems good for all quads. RPM differential is used to determine if motors are reversed when checking RPMs
+
+### 3d_stabilizeTimeMs
+Motor stabilization time using deadband throttle after reversal sync is complete
+
+### 3d_pidResetTimeMs
+PID reset time after reversal sync is complete
+
+### 3d_throttleStepDelay
+Range 1 to 50.  Slows down throttle adjustments to allow motors to better synchronize
+
+
 ![Betaflight](docs/assets/images/bf_logo.png)
 
 [![Latest version](https://img.shields.io/github/v/release/betaflight/betaflight)](https://github.com/betaflight/betaflight/releases) [![Build Status](https://dev.azure.com/Betaflight/Betaflight%20Nightlies/_apis/build/status/betaflight.betaflight?branchName=master)](https://dev.azure.com/Betaflight/Betaflight%20Nightlies/_build/latest?definitionId=8&branchName=master) [![Build Status](https://dev.azure.com/Betaflight/Betaflight%20Nightlies/_apis/build/status/betaflight.betaflight?branchName=4.2-maintenance)](https://dev.azure.com/Betaflight/Betaflight%20Nightlies/_build/latest?definitionId=8&branchName=4.2-maintenance) [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
