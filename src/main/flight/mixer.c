@@ -321,6 +321,31 @@ static void calculateThrottleAndCurrentMotorEndpoints(timeUs_t currentTimeUs)
         }
     } else {
         throttle = rcCommand[THROTTLE] - PWM_RANGE_MIN + throttleAngleCorrection;
+        currentThrottleInputRange = PWM_RANGE;
+
+#ifdef USE_DYN_IDLE
+        if (mixerRuntime.dynIdleMinRps > 0.0f) {
+            const float maxIncrease = isAirmodeActivated() ? mixerRuntime.dynIdleMaxIncrease : 0.05f;
+            float minRps = getMinMotorFrequency();
+            DEBUG_SET(DEBUG_DYN_IDLE, 3, lrintf(minRps * 10.0f));
+            float rpsError = mixerRuntime.dynIdleMinRps - minRps;
+            // PT1 type lowpass delay and smoothing for D
+            minRps = mixerRuntime.prevMinRps + mixerRuntime.minRpsDelayK * (minRps - mixerRuntime.prevMinRps);
+            float dynIdleD = (mixerRuntime.prevMinRps - minRps) * mixerRuntime.dynIdleDGain;
+            mixerRuntime.prevMinRps = minRps;
+            float dynIdleP = rpsError * mixerRuntime.dynIdlePGain;
+            rpsError = MAX(-0.1f, rpsError); //I rises fast, falls slowly
+            mixerRuntime.dynIdleI += rpsError * mixerRuntime.dynIdleIGain;
+            mixerRuntime.dynIdleI = constrainf(mixerRuntime.dynIdleI, 0.0f, maxIncrease);
+            motorRangeMinIncrease = constrainf((dynIdleP + mixerRuntime.dynIdleI + dynIdleD), 0.0f, maxIncrease);
+            DEBUG_SET(DEBUG_DYN_IDLE, 0, MAX(-1000, lrintf(dynIdleP * 10000)));
+            DEBUG_SET(DEBUG_DYN_IDLE, 1, lrintf(mixerRuntime.dynIdleI * 10000));
+            DEBUG_SET(DEBUG_DYN_IDLE, 2, lrintf(dynIdleD * 10000));
+        } else {
+            motorRangeMinIncrease = 0;
+        }
+#endif
+
 #if defined(USE_BATTERY_VOLTAGE_SAG_COMPENSATION)
         float motorRangeAttenuationFactor = 0;
         // reduce motorRangeMax when battery is full
@@ -429,7 +454,6 @@ static void applyMixToMotors(float motorMix[MAX_SUPPORTED_MOTORS], motorMixer_t 
 {
     // Now add in the desired throttle, but keep in a range that doesn't clip adjusted
     // roll/pitch/yaw. This could move throttle down, but also up for those low throttle flips.
-
     for (int i = 0; i < mixerRuntime.motorCount; i++) {
         float motorOutput = motorOutputMixSign * motorMix[i] + throttle * activeMixer[i].throttle;
 #ifdef USE_THRUST_LINEARIZATION
@@ -448,9 +472,9 @@ static void applyMixToMotors(float motorMix[MAX_SUPPORTED_MOTORS], motorMixer_t 
                 motorOutput = (motorOutput < motorRangeMin) ? mixerRuntime.disarmMotorOutput : motorOutput; // Prevent getting into special reserved range
             }
 #endif
-            motorOutput = constrain(motorOutput, mixerRuntime.disarmMotorOutput, motorRangeMax);
+            motorOutput = constrainf(motorOutput, mixerRuntime.disarmMotorOutput, motorRangeMax);
         } else {
-            motorOutput = constrain(motorOutput, motorRangeMin, motorRangeMax);
+            motorOutput = constrainf(motorOutput, motorRangeMin, motorRangeMax);
             if (reversalInProcess) {
                 if (!motorsynccomplete[i]) {
                     // Boost Throttle During Reversal Until MinSpeed is reached

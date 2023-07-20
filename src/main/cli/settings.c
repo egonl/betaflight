@@ -947,7 +947,7 @@ const clivalue_t valueTable[] = {
     { "3d_limit_high",              VAR_UINT16 | MASTER_VALUE, .config.minmaxUnsigned = { PWM_RANGE_MIDDLE, PWM_PULSE_MAX }, PG_MOTOR_3D_CONFIG, offsetof(flight3DConfig_t, limit3d_high) },
     { "3d_switched_mode",           VAR_UINT8 | MASTER_VALUE | MODE_LOOKUP, .config.lookup = { TABLE_OFF_ON }, PG_MOTOR_3D_CONFIG, offsetof(flight3DConfig_t, switched_mode3d) },
 
-// KBI
+// 3D Reversal Sync
     { "3d_minsyncspeed",             VAR_UINT16 | MASTER_VALUE, .config.minmaxUnsigned = { 100, 5000 }, PG_MOTOR_3D_CONFIG, offsetof(flight3DConfig_t, minsyncspeed3d) },
     { "3d_minsyncspeedphasetwo",     VAR_UINT16 | MASTER_VALUE, .config.minmaxUnsigned = { 2000, 10000 }, PG_MOTOR_3D_CONFIG, offsetof(flight3DConfig_t, minsyncspeedphasetwo3d) },
     { "3d_reversalrampuppwr",        VAR_UINT8  | MASTER_VALUE, .config.minmaxUnsigned = { 5, 100 }, PG_MOTOR_3D_CONFIG, offsetof(flight3DConfig_t, reversalrampuppwr3d) },

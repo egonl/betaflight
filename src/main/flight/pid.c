@@ -63,8 +63,8 @@
 
 #include "pid.h"
 
-#include "config/feature.h" //KBI
-#include "fc/rc_modes.h"  //KBI
+#include "config/feature.h"
+#include "fc/rc_modes.h"
 
 typedef enum {
     LEVEL_MODE_OFF = 0,
@@ -292,11 +292,11 @@ void pidResetIterm(void)
 #if defined(USE_ABSOLUTE_CONTROL)
         axisError[axis] = 0.0f;
 #endif
-        // kbi: This is Optional and Probably Not Needed
-        pidData[axis].P = 0.0f;
-        pidData[axis].D = 0.0f;
-        pidData[axis].F = 0.0f;
-        pidData[axis].Sum = 0.0f;
+        // This is Optional and Probably Not Needed
+        // pidData[axis].P = 0.0f;
+        // pidData[axis].D = 0.0f;
+        // pidData[axis].F = 0.0f;
+        // pidData[axis].Sum = 0.0f;
     }
 }
 
