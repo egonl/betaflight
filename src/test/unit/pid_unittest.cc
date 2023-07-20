@@ -112,7 +112,7 @@ extern "C" {
     }
     bool getShouldUpdateFeedforward() { return true; }
     void initRcProcessing(void) { }
-    bool isUpsidedown(void) { return false; }
+    bool isUpright(void) { return true; }
     bool featureIsEnabled(uint32_t) { return false; }
     bool IS_RC_MODE_ACTIVE(boxId_e) { return false; }
 }
